@@ -21,11 +21,31 @@ def geocode(city: str, client: httpx.Client) -> Location | None:
     results = data.get("results")
     if not results:
         return None
-    first = results[0]
+    first= results[0]
     return Location(
         name= first["name"],
         country= first["country"],
         latitude= first["latitude"],
         longitude= first["longitude"],
     )
-    
+
+
+WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
+
+
+@dataclass
+class Weather:
+    temperature_c: float
+    wind_kmh: float
+
+
+def get_weather(location: Location, client: httpx.Client) -> Weather:
+    """Return the current weather for a location."""
+    response= client.get(WEATHER_URL, params= {"latitude": location.latitude, "longitude": location.longitude, "current": "temperature_2m,wind_speed_10m",})
+    response.raise_for_status()
+    data= response.json()
+    current = data["current"]
+    return Weather(
+        temperature_c= current["temperature_2m"],
+        wind_kmh= current["wind_speed_10m"],
+    )
