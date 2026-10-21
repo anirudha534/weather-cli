@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-weather-cli = "weather_cli:main"
+weather-cli = "weather_cli.cli:main"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]

@@ -49,3 +49,28 @@ def get_weather(location: Location, client: httpx.Client) -> Weather:
         temperature_c= current["temperature_2m"],
         wind_kmh= current["wind_speed_10m"],
     )
+
+import time
+
+
+def get_json(client: httpx.Client, url: str, params: dict[str, str | float]) -> dict:
+    """GET a URL and return the parsed JSON, retrying on temporary failures."""
+    attempts = 3
+    for attempt in range(1, attempts + 1):
+    
+        try:
+            response= client.get(url, params= params)
+            response.raise_for_status()
+            return response.json()
+    
+        except httpx.TransportError:
+            if attempt == attempts:
+                raise
+
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code < 500 or attempt == attempts:
+                raise
+
+        time.sleep(2 ** (attempt - 1))
+
+    raise RuntimeError("unreachable")
