@@ -1,6 +1,11 @@
+import logging
+import time
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
 
@@ -15,9 +20,7 @@ class Location:
 
 def geocode(city: str, client: httpx.Client) -> Location | None:
     """Return the best match for a city name, or None if nothing is found."""
-    response = client.get(GEOCODE_URL, params = {"name": city, "count": 1})
-    response.raise_for_status()
-    data = response.json()
+    data = get_json(client, GEOCODE_URL, {"name": city, "count": 1})
     results = data.get("results")
     if not results:
         return None
@@ -41,19 +44,24 @@ class Weather:
 
 def get_weather(location: Location, client: httpx.Client) -> Weather:
     """Return the current weather for a location."""
-    response= client.get(WEATHER_URL, params= {"latitude": location.latitude, "longitude": location.longitude, "current": "temperature_2m,wind_speed_10m",})
-    response.raise_for_status()
-    data= response.json()
+    data = get_json(
+    client,
+    WEATHER_URL,
+    {
+        "latitude": location.latitude,
+        "longitude": location.longitude,
+        "current": "temperature_2m,wind_speed_10m",
+    },
+)
     current = data["current"]
     return Weather(
         temperature_c= current["temperature_2m"],
         wind_kmh= current["wind_speed_10m"],
     )
 
-import time
 
 
-def get_json(client: httpx.Client, url: str, params: dict[str, str | float]) -> dict:
+def get_json(client: httpx.Client, url: str, params: dict[str, str | float]) -> dict[str, Any]:
     """GET a URL and return the parsed JSON, retrying on temporary failures."""
     attempts = 3
     for attempt in range(1, attempts + 1):
@@ -65,11 +73,22 @@ def get_json(client: httpx.Client, url: str, params: dict[str, str | float]) -> 
     
         except httpx.TransportError:
             if attempt == attempts:
+                logger.error(
+                            "giving up",
+                            extra={"fields": {"attempt": attempt, "url": url}},)
                 raise
 
         except httpx.HTTPStatusError as e:
             if e.response.status_code < 500 or attempt == attempts:
+                logger.error(
+                            "giving up",
+                            extra={"fields": {"attempt": attempt, "url": url}},)
                 raise
+
+        logger.warning(
+            "retrying request",
+            extra={"fields": {"attempt": attempt, "wait_s": 2 ** (attempt - 1), "url": url}},
+)
 
         time.sleep(2 ** (attempt - 1))
 
